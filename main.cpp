@@ -1,5 +1,6 @@
 #include <iostream>
 #include <set>
+#include <stack>
 #include <vector>
 
 class Tree {
@@ -17,6 +18,14 @@ public:
 private:
     Node *root;
     Node *L = nullptr;
+
+    void clear(Node *node) {
+        if (node) {
+            clear(node->leftSon);  // Освобождаем левое поддерево
+            clear(node->rightSib); // Освобождаем правое поддерево
+            delete node;           // Освобождаем текущий узел
+        }
+    }
 
     void rec_push(Node *node, int key) {
         if (node->key > key) {
@@ -70,6 +79,11 @@ public:
         return root;
     }
 
+    void MAKENULL() {
+        clear(root);    // Освобождаем память
+        root = nullptr; // Устанавливаем корень в nullptr
+    }
+
     Node *PARENT(Node *node) const {
         return node->parent ? node->parent : L;
     }
@@ -94,6 +108,63 @@ public:
 
         rec_push(root, key);
     };
+
+    class ReverseIterator {
+    private:
+        std::stack<Node *> stack;
+
+        void pushLeft(Node *node) {
+            while (node) {
+                stack.push(node);
+                node = node->leftSon; // Идём по левым дочерним узлам
+            }
+        }
+
+    public:
+        ReverseIterator(Node *root) {
+            pushLeft(root);
+        }
+
+        bool hasNext() {
+            return !stack.empty();
+        }
+
+        Node *next() {
+            if (stack.empty()) {
+                return nullptr;
+            }
+
+            Node *current = stack.top();
+            stack.pop();
+
+            // Сначала добавляем правого потомка
+            pushLeft(current->rightSib);
+
+            return current;
+        }
+
+        // Операторы для совместимости с range-for
+        bool operator!=(const ReverseIterator &other) const {
+            return !stack.empty() || !other.stack.empty();
+        }
+
+        Node *operator*() const {
+            return stack.top();
+        }
+
+        ReverseIterator &operator++() {
+            next();
+            return *this;
+        }
+    };
+
+    ReverseIterator begin() {
+        return ReverseIterator(root);
+    }
+
+    ReverseIterator end() {
+        return ReverseIterator(nullptr);
+    }
 
     void reversePostOrder(Node *node) {
         if (!node)
@@ -131,6 +202,29 @@ public:
             printTree(node->rightSib, depth);
         }
     }
+
+    static Tree CREATE(int n, const std::vector<Tree> &subtrees) {
+        Tree newTree;
+        newTree.root = new Node(n);
+
+        for (const auto &subtree : subtrees) {
+            if (subtree.ROOT()) {
+                Node *child = subtree.ROOT();
+                child->parent = newTree.root; // Устанавливаем родительское отношение
+                if (!newTree.root->leftSon) {
+                    newTree.root->leftSon = child; // Первый дочерний узел
+                } else {
+                    Node *sibling = newTree.root->leftSon;
+                    while (sibling->rightSib) {
+                        sibling = sibling->rightSib; // Находим последнего дочернего узла
+                    }
+                    sibling->rightSib = child; // Добавляем как следующего брата
+                }
+            }
+        }
+
+        return newTree;
+    }
 };
 
 int main() {
@@ -161,14 +255,21 @@ int main() {
         }
     }
 
-    std::cout << "Tree A structure:\n\n";
+    std::cout << "Дерево А:\n\n";
     treeA.printTree();
 
-    std::cout << "\nTree B structure:\n\n";
+    std::cout << "\nДерево B:\n\n";
     treeB.printTree();
 
     treeA.reversePostOrder(treeB.ROOT());
 
-    std::cout << "Tree 'A = AUrev.B' structure:\n\n";
+    std::cout << "Дерево 'A = AUrev.B':\n\n";
     treeA.printTree();
+
+    std::cout << "\n\nОбратный обход дерева А:\n";
+    for (Tree::Node *node : treeA) { // Используем range-for
+        if (node && !node->isVirtual) {
+            std::cout << node->key << " ";
+        }
+    }
 }
